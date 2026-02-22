@@ -1,69 +1,89 @@
 "use client";
 
 import Link from "next/link";
-import { formatEther } from "viem";
-import { STATUS_LABELS, STATUS_COLORS } from "@/lib/config";
+import { formatUnits } from "viem";
 
 interface Props {
-  id: number;
+  address: string;
   creator: string;
-  username: string;
-  bondAmount: bigint;
-  targetAmount: bigint;
-  raisedAmount: bigint;
-  deadline: bigint;
-  status: number;
+  floor: bigint;
+  ceil: bigint;
+  totalRaised: bigint;
+  tokenSymbol: string;
+  tokenDecimals: number;
+  withdrawnAt: bigint;
 }
 
 export function CampaignCard({
-  id,
+  address,
   creator,
-  username,
-  bondAmount,
-  targetAmount,
-  raisedAmount,
-  deadline,
-  status,
+  floor,
+  ceil,
+  totalRaised,
+  tokenSymbol,
+  tokenDecimals,
+  withdrawnAt,
 }: Props) {
-  const raised = Number(formatEther(raisedAmount));
-  const target = Number(formatEther(targetAmount));
-  const progress = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
-  const deadlineDate = new Date(Number(deadline) * 1000);
-  const isExpired = deadlineDate < new Date();
+  const raised = Number(formatUnits(totalRaised, tokenDecimals));
+  const ceilNum = Number(formatUnits(ceil, tokenDecimals));
+  const floorNum = Number(formatUnits(floor, tokenDecimals));
+  const progress = ceilNum > 0 ? Math.min((raised / ceilNum) * 100, 100) : 0;
+  const isClosed = withdrawnAt > 0n;
 
   return (
-    <Link href={`/campaign/${id}`}>
+    <Link href={`/campaign/${address}`}>
       <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 hover:border-gray-600 transition cursor-pointer">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm text-gray-400">{username}</span>
+          <span className="text-sm text-gray-400 font-mono">
+            {address.slice(0, 6)}...{address.slice(-4)}
+          </span>
           <span
-            className={`text-xs px-2 py-1 rounded-full text-white ${STATUS_COLORS[status]}`}
+            className={`text-xs px-2 py-1 rounded-full text-white ${isClosed ? "bg-gray-500" : "bg-blue-500"}`}
           >
-            {STATUS_LABELS[status]}
+            {isClosed ? "Closed" : "Active"}
           </span>
         </div>
 
         <div className="mb-3">
           <div className="flex justify-between text-sm mb-1">
             <span className="text-gray-300">
-              {raised.toFixed(4)} / {target.toFixed(4)} ETH
+              {raised.toFixed(2)} {tokenSymbol} raised
             </span>
-            <span className="text-gray-500">{progress.toFixed(0)}%</span>
+            {ceilNum > 0 && (
+              <span className="text-gray-500">{progress.toFixed(0)}%</span>
+            )}
           </div>
-          <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-blue-500 rounded-full transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+          {ceilNum > 0 && (
+            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-500 rounded-full transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex justify-between text-xs text-gray-500">
-          <span>Bond: {formatEther(bondAmount)} ETH</span>
-          <span>{isExpired ? "Expired" : `Ends ${deadlineDate.toLocaleDateString()}`}</span>
+          {floorNum > 0 && (
+            <span>
+              Floor: {floorNum.toFixed(2)} {tokenSymbol}
+            </span>
+          )}
+          {ceilNum > 0 && (
+            <span>
+              Ceil: {ceilNum.toFixed(2)} {tokenSymbol}
+            </span>
+          )}
         </div>
         <div className="mt-2 text-xs text-gray-600 truncate">
-          by {creator.slice(0, 6)}...{creator.slice(-4)}
+          by{" "}
+          <Link
+            href={`/profile/${creator}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-blue-400 hover:underline"
+          >
+            {creator.slice(0, 6)}...{creator.slice(-4)}
+          </Link>
         </div>
       </div>
     </Link>

@@ -2,20 +2,21 @@ import { ethers } from "hardhat";
 
 async function main() {
   const [deployer] = await ethers.getSigners();
-  console.log("Deploying FundRaiser with account:", deployer.address);
+  console.log("Deploying with:", deployer.address);
 
-  const Factory = await ethers.getContractFactory("FundRaiser");
-  const contract = await Factory.deploy();
-  await contract.waitForDeployment();
+  // 1. Deploy Campaign implementation
+  const Campaign = await ethers.getContractFactory("Campaign");
+  const campaignImpl = await Campaign.deploy();
+  await campaignImpl.waitForDeployment();
+  const implAddress = await campaignImpl.getAddress();
+  console.log("Campaign Implementation:", implAddress);
 
-  const address = await contract.getAddress();
-  console.log("FundRaiser deployed to:", address);
-
-  // For local testing: whitelist the deployer
-  if (process.env.HARDHAT_NETWORK === "localhost" || !process.env.HARDHAT_NETWORK) {
-    await contract.setEligible(deployer.address, true);
-    console.log("Deployer whitelisted for testing");
-  }
+  // 2. Deploy CampaignFactory
+  const Factory = await ethers.getContractFactory("CampaignFactory");
+  const factory = await Factory.deploy(implAddress);
+  await factory.waitForDeployment();
+  const factoryAddress = await factory.getAddress();
+  console.log("CampaignFactory:", factoryAddress);
 }
 
 main().catch((error) => {

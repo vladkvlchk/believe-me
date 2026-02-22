@@ -6,6 +6,7 @@
     "compile": "hardhat compile",
     "test": "hardhat test",
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
     "deploy:base": "hardhat run scripts/deploy.ts --network base",
     "node": "hardhat node"
   },
@@ -17,6 +18,7 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.4.0"
+    "@openzeppelin/contracts": "^5.4.0",
+    "dotenv": "^16.6.1"
   }
 }

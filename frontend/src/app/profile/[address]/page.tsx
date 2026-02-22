@@ -1,115 +1,104 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useReadContract } from "wagmi";
-import { FUNDRAISER_ABI } from "@/lib/abi";
-import { CONTRACT_ADDRESS, STATUS_LABELS, STATUS_COLORS } from "@/lib/config";
-import { formatEther } from "viem";
+import { useReadContract, useReadContracts } from "wagmi";
+import { FACTORY_ABI, CAMPAIGN_ABI, ERC20_ABI } from "@/lib/abi";
+import { FACTORY_ADDRESS } from "@/lib/config";
+import { formatUnits } from "viem";
+import Link from "next/link";
 
 export default function ProfilePage() {
   const params = useParams();
   const address = params.address as string;
 
-  const { data: reputation } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: FUNDRAISER_ABI,
-    functionName: "getReputation",
-    args: [address as `0x${string}`],
+  const { data: campaigns } = useReadContract({
+    address: FACTORY_ADDRESS,
+    abi: FACTORY_ABI,
+    functionName: "getCampaigns",
   });
 
-  const { data: isEligible } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: FUNDRAISER_ABI,
-    functionName: "eligible",
-    args: [address as `0x${string}`],
-  });
-
-  const { data: campaignCount } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: FUNDRAISER_ABI,
-    functionName: "campaignCount",
-  });
-
-  const totalCampaigns = campaignCount ? Number(campaignCount) : 0;
-  const rep = reputation !== undefined ? Number(reputation) : 0;
+  const campaignAddresses = campaigns ?? [];
 
   return (
     <div className="max-w-2xl mx-auto">
       <div className="rounded-xl border border-gray-800 bg-gray-900 p-6 mb-6">
         <h1 className="text-2xl font-bold mb-1">Profile</h1>
-        <p className="text-gray-400 font-mono text-sm mb-4">
-          {address}
-        </p>
-
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center">
-            <p className="text-3xl font-bold">
-              <span className={rep > 0 ? "text-green-400" : rep < 0 ? "text-red-400" : "text-gray-400"}>
-                {rep > 0 ? `+${rep}` : rep}
-              </span>
-            </p>
-            <p className="text-xs text-gray-500 mt-1">Reputation</p>
-          </div>
-          <div className="text-center">
-            <p className="text-3xl font-bold text-white">
-              {isEligible ? "Yes" : "No"}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">Eligible</p>
-          </div>
-          <div className="text-center">
-            <p className="text-3xl font-bold text-white">-</p>
-            <p className="text-xs text-gray-500 mt-1">Campaigns</p>
-          </div>
-        </div>
+        <p className="text-gray-400 font-mono text-sm">{address}</p>
       </div>
 
       <h2 className="text-xl font-bold mb-4">Campaigns by this creator</h2>
 
       <div className="space-y-3">
-        {Array.from({ length: totalCampaigns }, (_, i) => (
-          <CreatorCampaign key={i} id={i} filterAddress={address} />
+        {campaignAddresses.length === 0 && (
+          <p className="text-gray-500 text-sm">No campaigns found.</p>
+        )}
+        {campaignAddresses.map((addr) => (
+          <CreatorCampaign key={addr} campaignAddress={addr} filterAddress={address} />
         ))}
       </div>
     </div>
   );
 }
 
-function CreatorCampaign({ id, filterAddress }: { id: number; filterAddress: string }) {
-  const { data } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: FUNDRAISER_ABI,
-    functionName: "getCampaign",
-    args: [BigInt(id)],
+function CreatorCampaign({
+  campaignAddress,
+  filterAddress,
+}: {
+  campaignAddress: `0x${string}`;
+  filterAddress: string;
+}) {
+  const { data: results } = useReadContracts({
+    contracts: [
+      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "creator" },
+      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "floor" },
+      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "ceil" },
+      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "totalRaised" },
+      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "token" },
+      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "withdrawnAt" },
+    ],
   });
 
-  if (!data) return null;
+  const tokenAddress = results?.[4]?.result as `0x${string}` | undefined;
 
-  const [creator, username, bondAmount, targetAmount, raisedAmount, deadline, status] = data;
+  const { data: tokenResults } = useReadContracts({
+    contracts: tokenAddress
+      ? [
+          { address: tokenAddress, abi: ERC20_ABI, functionName: "symbol" },
+          { address: tokenAddress, abi: ERC20_ABI, functionName: "decimals" },
+        ]
+      : [],
+  });
 
-  // Only show campaigns by this address
+  if (!results || results.some((r) => r.status !== "success")) return null;
+
+  const creator = results[0].result as string;
   if (creator.toLowerCase() !== filterAddress.toLowerCase()) return null;
 
-  const raised = Number(formatEther(raisedAmount));
-  const target = Number(formatEther(targetAmount));
+  if (!tokenResults || tokenResults.length < 2 || tokenResults.some((r) => r.status !== "success")) return null;
+
+  const totalRaised = results[3].result as bigint;
+  const withdrawnAt = results[5].result as bigint;
+  const tokenSymbol = tokenResults[0]!.result as string;
+  const tokenDecimals = tokenResults[1]!.result as number;
+  const isClosed = withdrawnAt > 0n;
 
   return (
-    <a href={`/campaign/${id}`} className="block">
+    <Link href={`/campaign/${campaignAddress}`} className="block">
       <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 hover:border-gray-600 transition">
         <div className="flex items-center justify-between">
-          <div>
-            <span className="text-white font-medium">Campaign #{id}</span>
-            <span className="text-gray-500 text-sm ml-2">{username}</span>
-          </div>
+          <span className="text-white font-mono text-sm">
+            {campaignAddress.slice(0, 6)}...{campaignAddress.slice(-4)}
+          </span>
           <span
-            className={`text-xs px-2 py-1 rounded-full text-white ${STATUS_COLORS[status]}`}
+            className={`text-xs px-2 py-1 rounded-full text-white ${isClosed ? "bg-gray-500" : "bg-blue-500"}`}
           >
-            {STATUS_LABELS[status]}
+            {isClosed ? "Closed" : "Active"}
           </span>
         </div>
         <div className="text-sm text-gray-400 mt-1">
-          {raised.toFixed(4)} / {target.toFixed(4)} ETH | Bond: {formatEther(bondAmount)} ETH
+          {formatUnits(totalRaised, tokenDecimals)} {tokenSymbol} raised
         </div>
       </div>
-    </a>
+    </Link>
   );
 }
