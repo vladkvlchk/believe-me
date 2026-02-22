@@ -7,6 +7,7 @@ export const FACTORY_ADDRESS =
   ("0x475C933d687C7C2B20138D235DAb234D4cec7a90" as `0x${string}`);
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+export const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL || API_URL;
 
 export const wagmiConfig = getDefaultConfig({
   appName: "Onchain Fundraiser",

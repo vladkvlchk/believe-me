@@ -7,4 +7,11 @@ export const config = {
   contractAddress: process.env.CONTRACT_ADDRESS || "",
   privateKey: process.env.ADMIN_PRIVATE_KEY || "",
   twitterScoreThreshold: 100,
+  databaseUrl:
+    process.env.DATABASE_URL ||
+    "postgresql://fundraiser:fundraiser@localhost:5432/fundraiser",
+  twitterClientId: process.env.TWITTER_CLIENT_ID || "",
+  twitterClientSecret: process.env.TWITTER_CLIENT_SECRET || "",
+  frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+  backendUrl: process.env.BACKEND_URL || "http://localhost:3001",
 };

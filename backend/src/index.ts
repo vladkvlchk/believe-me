@@ -2,9 +2,11 @@ import express from "express";
 import cors from "cors";
 import { config } from "./config";
 import { initContract } from "./services/contract";
+import { initDb } from "./services/db";
 import eligibilityRoutes from "./routes/eligibility";
 import campaignRoutes from "./routes/campaigns";
 import reputationRoutes from "./routes/reputation";
+import authRoutes from "./routes/auth";
 
 const app = express();
 
@@ -20,15 +22,27 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/eligibility", eligibilityRoutes);
 app.use("/api/campaigns", campaignRoutes);
 app.use("/api/reputation", reputationRoutes);
+app.use("/api/auth", authRoutes);
 
-// Init contract connection and start server
-try {
-  initContract();
-  console.log("Contract service initialized");
-} catch (err) {
-  console.warn("Contract service not initialized (set CONTRACT_ADDRESS and RPC_URL):", err);
+// Init services and start server
+async function start() {
+  try {
+    initContract();
+    console.log("Contract service initialized");
+  } catch (err) {
+    console.warn("Contract service not initialized:", err);
+  }
+
+  try {
+    await initDb();
+    console.log("Database initialized");
+  } catch (err) {
+    console.warn("Database not initialized (is Postgres running?):", err);
+  }
+
+  app.listen(config.port, () => {
+    console.log(`Backend API running on http://localhost:${config.port}`);
+  });
 }
 
-app.listen(config.port, () => {
-  console.log(`Backend API running on http://localhost:${config.port}`);
-});
+start();

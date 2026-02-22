@@ -1,15 +1,33 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useReadContract, useReadContracts } from "wagmi";
+import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { FACTORY_ABI, CAMPAIGN_ABI, ERC20_ABI } from "@/lib/abi";
-import { FACTORY_ADDRESS } from "@/lib/config";
+import { FACTORY_ADDRESS, API_URL, AUTH_URL } from "@/lib/config";
 import { formatUnits } from "viem";
 import Link from "next/link";
+
+interface TwitterProfile {
+  linked: boolean;
+  twitterUsername?: string;
+  twitterAvatar?: string;
+}
 
 export default function ProfilePage() {
   const params = useParams();
   const address = params.address as string;
+  const { address: myAddress } = useAccount();
+  const isOwnProfile = myAddress?.toLowerCase() === address.toLowerCase();
+
+  const [twitter, setTwitter] = useState<TwitterProfile | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/auth/profile/${address}`)
+      .then((r) => r.json())
+      .then(setTwitter)
+      .catch(() => setTwitter({ linked: false }));
+  }, [address]);
 
   const { data: campaigns } = useReadContract({
     address: FACTORY_ADDRESS,
@@ -22,8 +40,46 @@ export default function ProfilePage() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="rounded-xl border border-gray-800 bg-gray-900 p-6 mb-6">
-        <h1 className="text-2xl font-bold mb-1">Profile</h1>
-        <p className="text-gray-400 font-mono text-sm">{address}</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold mb-1">Profile</h1>
+            <p className="text-gray-400 font-mono text-sm">{address}</p>
+          </div>
+
+          {/* Twitter section */}
+          <div className="flex items-center gap-3">
+            {twitter === null ? (
+              <span className="text-gray-600 text-sm">Loading...</span>
+            ) : twitter.linked ? (
+              <a
+                href={`https://x.com/${twitter.twitterUsername}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-2 hover:bg-gray-700 transition"
+              >
+                {twitter.twitterAvatar && (
+                  <img
+                    src={twitter.twitterAvatar}
+                    alt=""
+                    className="w-8 h-8 rounded-full"
+                  />
+                )}
+                <span className="text-blue-400 text-sm font-medium">
+                  @{twitter.twitterUsername}
+                </span>
+              </a>
+            ) : isOwnProfile ? (
+              <a
+                href={`${AUTH_URL}/api/auth/twitter?wallet=${address}`}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-white text-sm font-medium hover:bg-blue-700 transition"
+              >
+                Connect Twitter
+              </a>
+            ) : (
+              <span className="text-gray-600 text-sm">No Twitter linked</span>
+            )}
+          </div>
+        </div>
       </div>
 
       <h2 className="text-xl font-bold mb-4">Campaigns by this creator</h2>

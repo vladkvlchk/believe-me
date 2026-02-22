@@ -21,6 +21,9 @@ export function Navbar() {
             <Link href="/create" className="text-gray-400 hover:text-white transition">
               Create
             </Link>
+            <Link href="/creators" className="text-gray-400 hover:text-white transition">
+              Creators
+            </Link>
             {address && (
               <Link href={`/profile/${address}`} className="text-gray-400 hover:text-white transition">
                 My Profile
