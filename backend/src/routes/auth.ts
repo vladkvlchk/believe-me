@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { config } from "../config";
 import { upsertProfile, getProfile, searchProfiles, getAllProfiles } from "../services/db";
+import { fetchTwitterScore } from "../services/twitterScore";
 
 const router = Router();
 
@@ -137,10 +138,12 @@ router.get("/profile/:wallet", async (req: Request, res: Response) => {
       res.json({ linked: false });
       return;
     }
+    const score = await fetchTwitterScore(profile.twitter_username);
     res.json({
       linked: true,
       twitterUsername: profile.twitter_username,
       twitterAvatar: profile.twitter_avatar,
+      twitterScore: score,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -1,22 +1,37 @@
-/**
- * Mock TwitterScore service.
- * In production, replace with real API call (e.g., Ethersign, Twitter API, etc.)
- */
+const scoreCache = new Map<string, { score: number; fetchedAt: number }>();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
-// Configurable mock scores for testing
-const mockScores: Record<string, number> = {};
+export async function fetchTwitterScore(username: string): Promise<number | null> {
+  const key = username.toLowerCase();
 
-export function setMockScore(wallet: string, score: number) {
-  mockScores[wallet.toLowerCase()] = score;
-}
-
-export function getTwitterScore(wallet: string): number {
-  const key = wallet.toLowerCase();
-  if (key in mockScores) {
-    return mockScores[key];
+  const cached = scoreCache.get(key);
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
+    return cached.score;
   }
-  // Default: generate a deterministic-ish score from the address
-  // Last 2 hex chars -> 0-255, so roughly half will be > 100
-  const lastBytes = parseInt(wallet.slice(-4), 16);
-  return lastBytes % 256;
+
+  try {
+    const res = await fetch(
+      `https://twitterscore.io/twitter/graph/ajax/?accountSlug=${encodeURIComponent(username)}`,
+      {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      }
+    );
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (!data.scores || data.scores.length === 0) return null;
+
+    const latest = data.scores[data.scores.length - 1];
+    const score = Math.round(latest.value);
+
+    scoreCache.set(key, { score, fetchedAt: Date.now() });
+    return score;
+  } catch {
+    return null;
+  }
 }

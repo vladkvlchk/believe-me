@@ -14,4 +14,5 @@ export const config = {
   twitterClientSecret: process.env.TWITTER_CLIENT_SECRET || "",
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
   backendUrl: process.env.BACKEND_URL || "http://localhost:3001",
+  factoryAddress: process.env.FACTORY_ADDRESS || "0x475C933d687C7C2B20138D235DAb234D4cec7a90",
 };
