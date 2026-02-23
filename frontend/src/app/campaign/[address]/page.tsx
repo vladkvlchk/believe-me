@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { formatUnits, parseUnits } from "viem";
+import { fmt, fmtToken } from "@/lib/fmt";
 import Link from "next/link";
 import {
   useAccount,
@@ -10,25 +11,75 @@ import {
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
+  useWatchContractEvent,
 } from "wagmi";
 import { CAMPAIGN_ABI, ERC20_ABI } from "@/lib/abi";
+import { API_URL } from "@/lib/config";
 import { DepositForm } from "@/components/DepositForm";
+import { Comments } from "@/components/Comments";
+import { ActivityFeed } from "@/components/ActivityFeed";
+
+interface CampaignMeta {
+  name: string;
+  description: string;
+  logo_url: string;
+  cover_url: string;
+}
+
+interface CreatorProfile {
+  twitterUsername?: string;
+  twitterAvatar?: string;
+}
 
 export default function CampaignPage() {
   const params = useParams();
-  const campaignAddress = params.address as `0x${string}`;
-  const { address: userAddress } = useAccount();
+  const rawParam = params.address as string;
+  const isAddress = rawParam.startsWith("0x");
 
-  const { data: results } = useReadContracts({
-    contracts: [
-      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "creator" },
-      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "floor" },
-      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "ceil" },
-      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "totalRaised" },
-      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "token" },
-      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "withdrawnAt" },
-      { address: campaignAddress, abi: CAMPAIGN_ABI, functionName: "returnedAmount" },
-    ],
+  const [resolvedAddress, setResolvedAddress] = useState<`0x${string}` | null>(
+    isAddress ? (rawParam as `0x${string}`) : null
+  );
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    if (isAddress) return;
+    fetch(`${API_URL}/api/stats/campaigns/by-username/${rawParam}`)
+      .then((r) => r.json())
+      .then((campaigns) => {
+        if (campaigns.length > 0) {
+          setResolvedAddress(campaigns[0].campaign as `0x${string}`);
+        } else {
+          setNotFound(true);
+        }
+      })
+      .catch(() => setNotFound(true));
+  }, [rawParam, isAddress]);
+
+  const campaignAddress = resolvedAddress!;
+  const { address: userAddress } = useAccount();
+  const [meta, setMeta] = useState<CampaignMeta | null>(null);
+  const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
+
+  useEffect(() => {
+    if (!resolvedAddress) return;
+    fetch(`${API_URL}/api/stats/campaign/${resolvedAddress}/meta`)
+      .then((r) => r.json())
+      .then((data) => data && setMeta(data))
+      .catch(() => {});
+  }, [resolvedAddress]);
+
+  const { data: results, refetch: refetchCampaign } = useReadContracts({
+    contracts: resolvedAddress
+      ? [
+          { address: resolvedAddress, abi: CAMPAIGN_ABI, functionName: "creator" },
+          { address: resolvedAddress, abi: CAMPAIGN_ABI, functionName: "floor" },
+          { address: resolvedAddress, abi: CAMPAIGN_ABI, functionName: "ceil" },
+          { address: resolvedAddress, abi: CAMPAIGN_ABI, functionName: "totalRaised" },
+          { address: resolvedAddress, abi: CAMPAIGN_ABI, functionName: "token" },
+          { address: resolvedAddress, abi: CAMPAIGN_ABI, functionName: "withdrawnAt" },
+          { address: resolvedAddress, abi: CAMPAIGN_ABI, functionName: "returnedAmount" },
+        ]
+      : [],
   });
 
   const tokenAddress = results?.[4]?.result as `0x${string}` | undefined;
@@ -42,22 +93,85 @@ export default function CampaignPage() {
       : [],
   });
 
-  const { data: myInvestment } = useReadContract({
-    address: campaignAddress,
+  const { data: myInvestment, refetch: refetchInvestment } = useReadContract({
+    address: resolvedAddress ?? undefined,
     abi: CAMPAIGN_ABI,
     functionName: "invests",
     args: userAddress ? [userAddress] : undefined,
   });
 
-  const { data: myClaimed } = useReadContract({
-    address: campaignAddress,
+  const { data: myClaimed, refetch: refetchClaimed } = useReadContract({
+    address: resolvedAddress ?? undefined,
     abi: CAMPAIGN_ABI,
     functionName: "claimed",
     args: userAddress ? [userAddress] : undefined,
   });
 
+  // Watch for Deposited events — auto-update on anyone's deposit
+  useWatchContractEvent({
+    address: resolvedAddress ?? undefined,
+    abi: CAMPAIGN_ABI,
+    eventName: "Deposited",
+    onLogs: () => {
+      refetchCampaign();
+      refetchInvestment();
+    },
+  });
+
+  // Also watch Withdrawn, FundsReturned, Refunded
+  useWatchContractEvent({
+    address: resolvedAddress ?? undefined,
+    abi: CAMPAIGN_ABI,
+    eventName: "Withdrawn",
+    onLogs: () => refetchCampaign(),
+  });
+
+  useWatchContractEvent({
+    address: resolvedAddress ?? undefined,
+    abi: CAMPAIGN_ABI,
+    eventName: "FundsReturned",
+    onLogs: () => refetchCampaign(),
+  });
+
+  useWatchContractEvent({
+    address: resolvedAddress ?? undefined,
+    abi: CAMPAIGN_ABI,
+    eventName: "Refunded",
+    onLogs: () => {
+      refetchCampaign();
+      refetchInvestment();
+    },
+  });
+
+  const handleDeposited = useCallback(() => {
+    refetchCampaign();
+    refetchInvestment();
+  }, [refetchCampaign, refetchInvestment]);
+
+  const creatorAddr = results?.[0]?.result as string | undefined;
+  useEffect(() => {
+    if (!creatorAddr) return;
+    fetch(`${API_URL}/api/auth/profile/${creatorAddr}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.linked) {
+          setCreatorProfile({
+            twitterUsername: data.twitterUsername,
+            twitterAvatar: data.twitterAvatar,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [creatorAddr]);
+
+  if (notFound) {
+    return <div className="text-center py-16 text-gray-500">Campaign not found</div>;
+  }
+
   if (
+    !resolvedAddress ||
     !results ||
+    results.length < 7 ||
     results.some((r) => r.status !== "success") ||
     !tokenResults ||
     tokenResults.length < 2 ||
@@ -66,12 +180,12 @@ export default function CampaignPage() {
     return <div className="text-center py-16 text-gray-500">Loading campaign...</div>;
   }
 
-  const creator = results[0].result as string;
-  const floor = results[1].result as bigint;
-  const ceil = results[2].result as bigint;
-  const totalRaised = results[3].result as bigint;
-  const withdrawnAt = results[5].result as bigint;
-  const returnedAmount = results[6].result as bigint;
+  const creator = results[0]!.result as string;
+  const floor = results[1]!.result as bigint;
+  const ceil = results[2]!.result as bigint;
+  const totalRaised = results[3]!.result as bigint;
+  const withdrawnAt = results[5]!.result as bigint;
+  const returnedAmount = results[6]!.result as bigint;
   const tokenSymbol = tokenResults[0]!.result as string;
   const tokenDecimals = tokenResults[1]!.result as number;
 
@@ -86,10 +200,21 @@ export default function CampaignPage() {
   const floorMet = floor === 0n || totalRaised >= floor;
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-5xl mx-auto">
+      {/* Cover image */}
+      {meta?.cover_url && (
+        <div className="rounded-xl overflow-hidden mb-4 h-48">
+          <img src={meta.cover_url} alt="" className="w-full h-full object-cover" />
+        </div>
+      )}
+
+      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-2xl font-bold">Campaign</h1>
+          {meta?.logo_url && (
+            <img src={meta.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover" />
+          )}
+          <h1 className="text-2xl font-bold">{meta?.name || "Campaign"}</h1>
           <span
             className={`text-xs px-2 py-1 rounded-full text-white ${isClosed ? "bg-gray-500" : "bg-blue-500"}`}
           >
@@ -97,164 +222,132 @@ export default function CampaignPage() {
           </span>
         </div>
         <p className="text-gray-400 font-mono text-sm">{campaignAddress}</p>
-        <p className="text-gray-400 text-sm mt-1">
-          by{" "}
-          <Link href={`/profile/${creator}`} className="text-blue-400 hover:underline">
-            {creator.slice(0, 6)}...{creator.slice(-4)}
+        <div className="flex items-center gap-1.5 text-sm mt-1">
+          <span className="text-gray-400">by</span>
+          <Link href={`/profile/${creator}`} className="text-blue-400 hover:underline inline-flex items-center gap-1.5">
+            {creatorProfile?.twitterAvatar && (
+              <img src={creatorProfile.twitterAvatar} alt="" className="w-5 h-5 rounded-full" />
+            )}
+            {creatorProfile?.twitterUsername
+              ? `@${creatorProfile.twitterUsername}`
+              : `${creator.slice(0, 6)}...${creator.slice(-4)}`}
           </Link>
-        </p>
+        </div>
+        {meta?.description && (
+          <p className="text-gray-300 text-sm mt-3">{meta.description}</p>
+        )}
       </div>
 
-      {/* Progress */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 mb-4">
-        <div className="flex justify-between text-sm mb-2">
-          <span className="text-gray-300">
-            {raised.toFixed(2)} {tokenSymbol} raised
-          </span>
-          {ceilNum > 0 && <span className="text-gray-500">{progress.toFixed(0)}%</span>}
-        </div>
-        {ceilNum > 0 && (
-          <div className="h-3 bg-gray-800 rounded-full overflow-hidden mb-4">
-            <div
-              className="h-full bg-blue-500 rounded-full transition-all"
-              style={{ width: `${progress}%` }}
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Left column — campaign info & creator/investor actions */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Claim — investor, after returnFunds */}
+          {isClosed && hasInvestment && returnedAmount > 0n && (
+            <ClaimSection
+              campaignAddress={campaignAddress}
+              tokenDecimals={tokenDecimals}
+              tokenSymbol={tokenSymbol}
+              myInvestment={myInvestment!}
+              totalRaised={totalRaised}
+              returnedAmount={returnedAmount}
+              myClaimed={myClaimed ?? 0n}
+              onClaimed={refetchClaimed}
             />
-          </div>
-        )}
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-gray-500">Floor</span>
-            <p className="text-white">
-              {floorNum > 0 ? `${floorNum.toFixed(2)} ${tokenSymbol}` : "None"}
-            </p>
-          </div>
-          <div>
-            <span className="text-gray-500">Ceil</span>
-            <p className="text-white">
-              {ceilNum > 0 ? `${ceilNum.toFixed(2)} ${tokenSymbol}` : "Unlimited"}
-            </p>
-          </div>
-        </div>
-        {hasInvestment && (
-          <div className="mt-3 text-sm">
-            <span className="text-gray-500">Your investment: </span>
-            <span className="text-green-400">
-              {formatUnits(myInvestment!, tokenDecimals)} {tokenSymbol}
-            </span>
-          </div>
-        )}
-        {returnedAmount > 0n && (
-          <div className="mt-2 text-sm">
-            <span className="text-gray-500">Returned by creator: </span>
-            <span className="text-yellow-400">
-              {formatUnits(returnedAmount, tokenDecimals)} {tokenSymbol}
-            </span>
-          </div>
-        )}
-      </div>
+          )}
 
-      {/* Deposit form — only when active */}
-      {isActive && tokenAddress && (
-        <div className="mb-4">
-          <DepositForm
+          {/* Creator actions */}
+          {isCreator && isActive && floorMet && totalRaised > 0n && (
+            <WithdrawSection campaignAddress={campaignAddress} />
+          )}
+
+          {isCreator && isClosed && tokenAddress && (
+            <ReturnFundsSection
+              campaignAddress={campaignAddress}
+              tokenAddress={tokenAddress}
+              tokenDecimals={tokenDecimals}
+              tokenSymbol={tokenSymbol}
+            />
+          )}
+
+          <ActivityFeed
             campaignAddress={campaignAddress}
-            tokenAddress={tokenAddress}
             tokenSymbol={tokenSymbol}
             tokenDecimals={tokenDecimals}
           />
+
+          <Comments campaignAddress={campaignAddress} />
         </div>
-      )}
 
-      {/* Refund — investor, before withdraw */}
-      {isActive && hasInvestment && (
-        <RefundSection
-          campaignAddress={campaignAddress}
-          tokenDecimals={tokenDecimals}
-          tokenSymbol={tokenSymbol}
-          maxAmount={myInvestment!}
-        />
-      )}
+        {/* Right column — progress + deposit */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Progress card */}
+          <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-gray-300">
+                {fmt(raised, 2)} {tokenSymbol} raised
+              </span>
+              {ceilNum > 0 && <span className="text-gray-500">{progress.toFixed(0)}%</span>}
+            </div>
+            {ceilNum > 0 && (
+              <div className="relative h-3 bg-gray-800 rounded-full overflow-hidden mb-4">
+                <div
+                  className="h-full bg-blue-500 rounded-full transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+                {floorNum > 0 && ceilNum > 0 && (
+                  <div
+                    className="absolute top-0 w-0.5 h-full bg-yellow-500"
+                    style={{ left: `${Math.min((floorNum / ceilNum) * 100, 100)}%` }}
+                  />
+                )}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-500">Floor</span>
+                <p className="text-white">
+                  {floorNum > 0 ? `${fmt(floorNum, 2)} ${tokenSymbol}` : "None"}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-500">Ceil</span>
+                <p className="text-white">
+                  {ceilNum > 0 ? `${fmt(ceilNum, 2)} ${tokenSymbol}` : "Unlimited"}
+                </p>
+              </div>
+            </div>
+            {hasInvestment && (
+              <div className="mt-3 pt-3 border-t border-gray-800 text-sm">
+                <span className="text-gray-500">Your investment: </span>
+                <span className="text-green-400">
+                  {fmtToken(myInvestment!, tokenDecimals)} {tokenSymbol}
+                </span>
+              </div>
+            )}
+            {returnedAmount > 0n && (
+              <div className="mt-2 text-sm">
+                <span className="text-gray-500">Returned by creator: </span>
+                <span className="text-yellow-400">
+                  {fmtToken(returnedAmount, tokenDecimals)} {tokenSymbol}
+                </span>
+              </div>
+            )}
+          </div>
 
-      {/* Claim — investor, after returnFunds */}
-      {isClosed && hasInvestment && returnedAmount > 0n && (
-        <ClaimSection
-          campaignAddress={campaignAddress}
-          tokenDecimals={tokenDecimals}
-          tokenSymbol={tokenSymbol}
-          myInvestment={myInvestment!}
-          totalRaised={totalRaised}
-          returnedAmount={returnedAmount}
-          myClaimed={myClaimed ?? 0n}
-        />
-      )}
-
-      {/* Creator actions */}
-      {isCreator && isActive && floorMet && totalRaised > 0n && (
-        <WithdrawSection campaignAddress={campaignAddress} />
-      )}
-
-      {isCreator && isClosed && tokenAddress && (
-        <ReturnFundsSection
-          campaignAddress={campaignAddress}
-          tokenAddress={tokenAddress}
-          tokenDecimals={tokenDecimals}
-          tokenSymbol={tokenSymbol}
-        />
-      )}
-    </div>
-  );
-}
-
-function RefundSection({
-  campaignAddress,
-  tokenDecimals,
-  tokenSymbol,
-  maxAmount,
-}: {
-  campaignAddress: `0x${string}`;
-  tokenDecimals: number;
-  tokenSymbol: string;
-  maxAmount: bigint;
-}) {
-  const [amount, setAmount] = useState("");
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
-
-  function handleRefund() {
-    if (!amount) return;
-    writeContract({
-      address: campaignAddress,
-      abi: CAMPAIGN_ABI,
-      functionName: "refund",
-      args: [parseUnits(amount, tokenDecimals)],
-    });
-  }
-
-  return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 mb-4">
-      <h3 className="text-lg font-semibold mb-2">Refund</h3>
-      <p className="text-xs text-gray-500 mb-2">
-        Max: {formatUnits(maxAmount, tokenDecimals)} {tokenSymbol}
-      </p>
-      <div className="flex gap-2">
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="Amount"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className="flex-1 rounded-lg bg-gray-800 border border-gray-700 px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-        />
-        <button
-          onClick={handleRefund}
-          disabled={isPending || isConfirming || !amount}
-          className="rounded-lg bg-yellow-600 px-5 py-2 text-white font-medium hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-        >
-          {isPending ? "Confirm..." : isConfirming ? "Refunding..." : "Refund"}
-        </button>
+          {/* Deposit / Refund form — only when active */}
+          {isActive && tokenAddress && (
+            <DepositForm
+              campaignAddress={campaignAddress}
+              tokenAddress={tokenAddress}
+              tokenSymbol={tokenSymbol}
+              tokenDecimals={tokenDecimals}
+              onDeposited={handleDeposited}
+              refund={hasInvestment ? { maxAmount: myInvestment! } : undefined}
+            />
+          )}
+        </div>
       </div>
-      {isSuccess && <p className="mt-2 text-sm text-green-400">Refunded!</p>}
     </div>
   );
 }
@@ -267,6 +360,7 @@ function ClaimSection({
   totalRaised,
   returnedAmount,
   myClaimed,
+  onClaimed,
 }: {
   campaignAddress: `0x${string}`;
   tokenDecimals: number;
@@ -275,9 +369,14 @@ function ClaimSection({
   totalRaised: bigint;
   returnedAmount: bigint;
   myClaimed: bigint;
+  onClaimed: () => void;
 }) {
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  useEffect(() => {
+    if (isSuccess) onClaimed();
+  }, [isSuccess, onClaimed]);
 
   const totalClaimable = (returnedAmount * myInvestment) / totalRaised;
   const claimable = totalClaimable - myClaimed;
@@ -293,10 +392,10 @@ function ClaimSection({
   if (claimable <= 0n) return null;
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 mb-4">
+    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
       <h3 className="text-lg font-semibold mb-2">Claim Returned Funds</h3>
       <p className="text-sm text-gray-400 mb-3">
-        You can claim {formatUnits(claimable, tokenDecimals)} {tokenSymbol}
+        You can claim {fmtToken(claimable, tokenDecimals)} {tokenSymbol}
       </p>
       <button
         onClick={handleClaim}
@@ -323,7 +422,7 @@ function WithdrawSection({ campaignAddress }: { campaignAddress: `0x${string}` }
   }
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 mb-4">
+    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
       <h3 className="text-lg font-semibold mb-2">Creator: Withdraw Funds</h3>
       <p className="text-sm text-gray-400 mb-3">
         Floor met. You can withdraw all raised funds.
@@ -377,9 +476,9 @@ function ReturnFundsSection({
   const { isLoading: returnConfirming, isSuccess: returnSuccess } =
     useWaitForTransactionReceipt({ hash: returnHash });
 
-  if (approveSuccess) {
-    refetchAllowance();
-  }
+  useEffect(() => {
+    if (approveSuccess) refetchAllowance();
+  }, [approveSuccess, refetchAllowance]);
 
   const parsedAmount = amount ? parseUnits(amount, tokenDecimals) : 0n;
   const needsApproval = allowance !== undefined && parsedAmount > allowance;
@@ -405,7 +504,7 @@ function ReturnFundsSection({
   }
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 mb-4">
+    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
       <h3 className="text-lg font-semibold mb-2">Creator: Return Funds</h3>
       <p className="text-sm text-gray-400 mb-3">
         Return funds to investors proportionally.

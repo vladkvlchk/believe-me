@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseUnits } from "viem";
 import {
   useAccount,
@@ -9,16 +9,25 @@ import {
   useReadContract,
 } from "wagmi";
 import { FACTORY_ABI, ERC20_ABI } from "@/lib/abi";
-import { FACTORY_ADDRESS } from "@/lib/config";
+import { FACTORY_ADDRESS, API_URL } from "@/lib/config";
+import { useRouter } from "next/navigation";
 
 const USDC_SEPOLIA = "0x16F1A20989b833Fd66b233d1Ae1eFD70F3004446";
 
 export default function CreatePage() {
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
+  const router = useRouter();
 
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [floorAmount, setFloorAmount] = useState("");
   const [ceilAmount, setCeilAmount] = useState("");
   const [tokenAddress, setTokenAddress] = useState(USDC_SEPOLIA);
+  const [metaSaved, setMetaSaved] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
+  const coverRef = useRef<HTMLInputElement>(null);
 
   const { data: isAllowed } = useReadContract({
     address: FACTORY_ADDRESS,
@@ -40,12 +49,54 @@ export default function CreatePage() {
   });
 
   const { writeContract, data: hash, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash });
 
   const decimals = tokenDecimals ?? 6;
 
+  function handleFilePreview(
+    file: File | undefined,
+    setter: (url: string | null) => void
+  ) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setter(url);
+  }
+
+  // After tx confirmed, save metadata and redirect
+  useEffect(() => {
+    if (!isSuccess || !receipt || metaSaved) return;
+
+    const createdLog = receipt.logs.find(
+      (log) => log.address.toLowerCase() === FACTORY_ADDRESS.toLowerCase()
+    );
+
+    if (createdLog && createdLog.topics[1]) {
+      const campaignAddress = "0x" + createdLog.topics[1].slice(26);
+
+      const formData = new FormData();
+      formData.append("creator", address || "");
+      formData.append("name", name || "Untitled Campaign");
+      formData.append("description", description);
+
+      const logoFile = logoRef.current?.files?.[0];
+      const coverFile = coverRef.current?.files?.[0];
+      if (logoFile) formData.append("logo", logoFile);
+      if (coverFile) formData.append("cover", coverFile);
+
+      fetch(`${API_URL}/api/stats/campaign/${campaignAddress}/meta`, {
+        method: "POST",
+        body: formData,
+      })
+        .then(() => {
+          setMetaSaved(true);
+          router.push(`/campaign/${campaignAddress}`);
+        })
+        .catch(console.error);
+    }
+  }, [isSuccess, receipt, metaSaved, address, name, description, router]);
+
   function handleCreate() {
-    if (!tokenAddress) return;
+    if (!tokenAddress || !name.trim()) return;
     const floor = floorAmount ? parseUnits(floorAmount, decimals) : 0n;
     const ceil = ceilAmount ? parseUnits(ceilAmount, decimals) : 0n;
     writeContract({
@@ -73,6 +124,73 @@ export default function CreatePage() {
         <h2 className="text-lg font-semibold mb-4">Campaign Details</h2>
 
         <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Campaign Name *</label>
+            <input
+              type="text"
+              placeholder="e.g. DeFi Yield Strategy Q1"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-lg bg-gray-800 border border-gray-700 px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Description</label>
+            <textarea
+              placeholder="Describe your campaign — what you'll do with the funds, expected returns, timeline..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="w-full rounded-lg bg-gray-800 border border-gray-700 px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
+            />
+          </div>
+
+          {/* Image uploads */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Logo</label>
+              <div
+                onClick={() => logoRef.current?.click()}
+                className="relative w-full aspect-square rounded-lg bg-gray-800 border border-gray-700 border-dashed flex items-center justify-center cursor-pointer hover:border-gray-500 transition overflow-hidden"
+              >
+                {logoPreview ? (
+                  <img src={logoPreview} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-gray-500 text-sm text-center px-2">Click to upload logo</span>
+                )}
+              </div>
+              <input
+                ref={logoRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleFilePreview(e.target.files?.[0], setLogoPreview)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Cover Image</label>
+              <div
+                onClick={() => coverRef.current?.click()}
+                className="relative w-full aspect-square rounded-lg bg-gray-800 border border-gray-700 border-dashed flex items-center justify-center cursor-pointer hover:border-gray-500 transition overflow-hidden"
+              >
+                {coverPreview ? (
+                  <img src={coverPreview} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-gray-500 text-sm text-center px-2">Click to upload cover</span>
+                )}
+              </div>
+              <input
+                ref={coverRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleFilePreview(e.target.files?.[0], setCoverPreview)}
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm text-gray-400 mb-1">Token Address</label>
             <input
@@ -127,7 +245,7 @@ export default function CreatePage() {
 
           <button
             onClick={handleCreate}
-            disabled={isPending || isConfirming || !tokenAddress || isAllowed === false}
+            disabled={isPending || isConfirming || !tokenAddress || isAllowed === false || !name.trim()}
             className="w-full rounded-lg bg-blue-600 py-3 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             {isPending ? "Confirm in wallet..." : isConfirming ? "Creating..." : "Create Campaign"}
@@ -135,7 +253,7 @@ export default function CreatePage() {
 
           {isSuccess && (
             <p className="text-green-400 text-sm text-center">
-              Campaign created! View it on the home page.
+              Campaign created! Redirecting...
             </p>
           )}
         </div>

@@ -1,11 +1,22 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useReadContract, useReadContracts } from "wagmi";
 import { FACTORY_ABI, CAMPAIGN_ABI, ERC20_ABI } from "@/lib/abi";
-import { FACTORY_ADDRESS } from "@/lib/config";
+import { FACTORY_ADDRESS, API_URL } from "@/lib/config";
 import { CampaignCard } from "@/components/CampaignCard";
 
+interface CampaignMeta {
+  campaign: string;
+  name: string;
+  description: string;
+  logo_url: string;
+  cover_url: string;
+}
+
 export default function HomePage() {
+  const [metaMap, setMetaMap] = useState<Map<string, CampaignMeta>>(new Map());
+
   const { data: campaigns } = useReadContract({
     address: FACTORY_ADDRESS,
     abi: FACTORY_ABI,
@@ -13,6 +24,19 @@ export default function HomePage() {
   });
 
   const campaignAddresses = campaigns ?? [];
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/stats/campaigns/meta`)
+      .then((r) => r.json())
+      .then((data: CampaignMeta[]) => {
+        const map = new Map<string, CampaignMeta>();
+        for (const m of data) {
+          map.set(m.campaign.toLowerCase(), m);
+        }
+        setMetaMap(map);
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <div>
@@ -31,7 +55,11 @@ export default function HomePage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {campaignAddresses.map((addr) => (
-            <CampaignItem key={addr} address={addr} />
+            <CampaignItem
+              key={addr}
+              address={addr}
+              meta={metaMap.get(addr.toLowerCase())}
+            />
           ))}
         </div>
       )}
@@ -39,7 +67,13 @@ export default function HomePage() {
   );
 }
 
-function CampaignItem({ address }: { address: `0x${string}` }) {
+function CampaignItem({
+  address,
+  meta,
+}: {
+  address: `0x${string}`;
+  meta?: CampaignMeta;
+}) {
   const { data: results } = useReadContracts({
     contracts: [
       { address, abi: CAMPAIGN_ABI, functionName: "creator" },
@@ -82,6 +116,9 @@ function CampaignItem({ address }: { address: `0x${string}` }) {
       tokenSymbol={tokenResults[0]!.result as string}
       tokenDecimals={tokenResults[1]!.result as number}
       withdrawnAt={results[5].result as bigint}
+      name={meta?.name}
+      logoUrl={meta?.logo_url}
+      coverUrl={meta?.cover_url}
     />
   );
 }
