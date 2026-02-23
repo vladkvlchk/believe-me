@@ -215,13 +215,13 @@ export default function ProfilePage() {
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-white">
-                      {fmt(Number(stats.creator_total_raised))}
+                      {fmt(Number(stats.creator_total_raised), 2)}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">Total Raised</p>
                   </div>
                   <div className="text-center">
                     <p className={`text-2xl font-bold ${creatorPnl >= 0 ? "text-green-400" : "text-red-400"}`}>
-                      {creatorPnl >= 0 ? "+" : ""}{fmt(creatorPnl)}
+                      {creatorPnl >= 0 ? "+" : ""}{fmt(creatorPnl, 2)}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">Campaigns PnL</p>
                   </div>
@@ -240,13 +240,13 @@ export default function ProfilePage() {
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-white">
-                      {fmt(Number(stats.investor_total_deposited))}
+                      {fmt(Number(stats.investor_total_deposited), 2)}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">Total Deposited</p>
                   </div>
                   <div className="text-center">
                     <p className={`text-2xl font-bold ${investorPnl >= 0 ? "text-green-400" : "text-red-400"}`}>
-                      {investorPnl >= 0 ? "+" : ""}{fmt(investorPnl)}
+                      {investorPnl >= 0 ? "+" : ""}{fmt(investorPnl, 2)}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">Invests PnL</p>
                   </div>

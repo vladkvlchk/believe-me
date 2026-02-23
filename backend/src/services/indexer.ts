@@ -116,6 +116,7 @@ async function processDeposited(log: ethers.Log, parsed: ethers.LogDescription, 
 
   await recomputeCampaignStats(campaignAddr);
   await recomputeUserInvestorStats(investor);
+  await recomputeCreatorForCampaign(campaignAddr);
 }
 
 async function processWithdrawn(log: ethers.Log, parsed: ethers.LogDescription, campaignAddr: string) {
@@ -128,6 +129,7 @@ async function processWithdrawn(log: ethers.Log, parsed: ethers.LogDescription, 
   );
 
   await recomputeCampaignStats(campaignAddr);
+  await recomputeCreatorForCampaign(campaignAddr);
 }
 
 async function processRefunded(log: ethers.Log, parsed: ethers.LogDescription, campaignAddr: string) {
@@ -141,6 +143,7 @@ async function processRefunded(log: ethers.Log, parsed: ethers.LogDescription, c
 
   await recomputeCampaignStats(campaignAddr);
   await recomputeUserInvestorStats(investor);
+  await recomputeCreatorForCampaign(campaignAddr);
 }
 
 async function processFundsReturned(log: ethers.Log, parsed: ethers.LogDescription, campaignAddr: string) {
@@ -209,6 +212,12 @@ async function recomputeCampaignStats(campaignAddr: string) {
   });
 }
 
+async function recomputeCreatorForCampaign(campaignAddr: string) {
+  const campaign = new ethers.Contract(campaignAddr, CAMPAIGN_ABI, provider);
+  const creator = await campaign.creator();
+  await recomputeUserCreatorStats(creator);
+}
+
 async function recomputeUserCreatorStats(wallet: string) {
   const walletLower = wallet.toLowerCase();
 
@@ -244,31 +253,46 @@ async function recomputeUserCreatorStats(wallet: string) {
 async function recomputeUserInvestorStats(wallet: string) {
   const walletLower = wallet.toLowerCase();
 
+  // Get per-campaign deposits with token decimals for proper formatting
   const { rows: deposits } = await query(
-    `SELECT campaign, SUM((args->>'amount')::numeric) as total
-     FROM events WHERE event_name = 'Deposited' AND args->>'investor' = $1
-     GROUP BY campaign`,
+    `SELECT e.campaign, SUM((e.args->>'amount')::numeric) as total, cs.token_decimals
+     FROM events e
+     JOIN campaign_stats cs ON e.campaign = cs.campaign
+     WHERE e.event_name = 'Deposited' AND e.args->>'investor' = $1
+     GROUP BY e.campaign, cs.token_decimals`,
     [walletLower]
   );
 
   const { rows: claims } = await query(
-    `SELECT SUM((args->>'amount')::numeric) as total
-     FROM events WHERE event_name = 'Claimed' AND args->>'investor' = $1`,
+    `SELECT e.campaign, SUM((e.args->>'amount')::numeric) as total, cs.token_decimals
+     FROM events e
+     JOIN campaign_stats cs ON e.campaign = cs.campaign
+     WHERE e.event_name = 'Claimed' AND e.args->>'investor' = $1
+     GROUP BY e.campaign, cs.token_decimals`,
     [walletLower]
   );
 
   const { rows: refunds } = await query(
-    `SELECT SUM((args->>'amount')::numeric) as total
-     FROM events WHERE event_name = 'Refunded' AND args->>'investor' = $1`,
+    `SELECT e.campaign, SUM((e.args->>'amount')::numeric) as total, cs.token_decimals
+     FROM events e
+     JOIN campaign_stats cs ON e.campaign = cs.campaign
+     WHERE e.event_name = 'Refunded' AND e.args->>'investor' = $1
+     GROUP BY e.campaign, cs.token_decimals`,
     [walletLower]
   );
 
   let investorTotalDeposited = 0;
   for (const d of deposits) {
-    investorTotalDeposited += Number(d.total);
+    investorTotalDeposited += Number(ethers.formatUnits(BigInt(d.total), d.token_decimals));
   }
-  const investorTotalClaimed = Number(claims[0]?.total || 0);
-  const investorTotalRefunded = Number(refunds[0]?.total || 0);
+  let investorTotalClaimed = 0;
+  for (const c of claims) {
+    investorTotalClaimed += Number(ethers.formatUnits(BigInt(c.total), c.token_decimals));
+  }
+  let investorTotalRefunded = 0;
+  for (const r of refunds) {
+    investorTotalRefunded += Number(ethers.formatUnits(BigInt(r.total), r.token_decimals));
+  }
   const investorPnl = investorTotalClaimed + investorTotalRefunded - investorTotalDeposited;
 
   const prev = await getUserStats(walletLower);
