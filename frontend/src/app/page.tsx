@@ -12,6 +12,7 @@ interface CampaignMeta {
   description: string;
   logo_url: string;
   cover_url: string;
+  created_at: string;
 }
 
 export default function HomePage() {
@@ -42,13 +43,13 @@ export default function HomePage() {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Active Campaigns</h1>
-        <p className="text-gray-400">
+        <p className="text-gray-500">
           Browse fundraising campaigns. All funds held in smart contract escrow.
         </p>
       </div>
 
       {campaignAddresses.length === 0 ? (
-        <div className="text-center py-16 text-gray-500">
+        <div className="text-center py-16 text-gray-400">
           <p className="text-lg">No campaigns yet.</p>
           <p className="text-sm mt-1">Be the first to create one!</p>
         </div>
@@ -103,7 +104,7 @@ function CampaignItem({
     tokenResults.length < 2 ||
     tokenResults.some((r) => r.status !== "success")
   ) {
-    return <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 animate-pulse h-40" />;
+    return <div className="rounded-xl border border-gray-200 bg-white p-5 animate-pulse h-40" />;
   }
 
   return (
@@ -117,8 +118,8 @@ function CampaignItem({
       tokenDecimals={tokenResults[1]!.result as number}
       withdrawnAt={results[5].result as bigint}
       name={meta?.name}
-      logoUrl={meta?.logo_url}
       coverUrl={meta?.cover_url}
+      createdAt={meta?.created_at}
     />
   );
 }

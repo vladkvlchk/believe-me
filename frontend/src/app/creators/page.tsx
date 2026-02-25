@@ -37,20 +37,20 @@ export default function CreatorsPage() {
         placeholder="Search by @username or wallet address..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full rounded-lg bg-gray-800 border border-gray-700 px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 mb-6"
+        className="w-full rounded-lg bg-white border border-gray-200 px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 mb-6"
       />
 
       {loading ? (
-        <div className="text-center py-8 text-gray-500">Loading...</div>
+        <div className="text-center py-8 text-gray-400">Loading...</div>
       ) : profiles.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-8 text-gray-400">
           {search ? "No creators found." : "No creators have linked Twitter yet."}
         </div>
       ) : (
         <div className="space-y-3">
           {profiles.map((p) => (
             <Link key={p.wallet} href={`/profile/${p.wallet}`} className="block">
-              <div className="flex items-center gap-4 rounded-xl border border-gray-800 bg-gray-900 p-4 hover:border-gray-600 transition">
+              <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 hover:border-gray-300 transition">
                 {p.twitter_avatar ? (
                   <img
                     src={p.twitter_avatar}
@@ -58,13 +58,13 @@ export default function CreatorsPage() {
                     className="w-10 h-10 rounded-full"
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-gray-700" />
+                  <div className="w-10 h-10 rounded-full bg-gray-200" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-white font-medium">
+                  <p className="text-gray-900 font-medium">
                     @{p.twitter_username}
                   </p>
-                  <p className="text-gray-500 text-xs font-mono truncate">
+                  <p className="text-gray-400 text-xs font-mono truncate">
                     {p.wallet}
                   </p>
                 </div>

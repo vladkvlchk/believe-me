@@ -21,11 +21,11 @@ interface CampaignEvent {
 }
 
 const EVENT_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  Deposited: { label: "Deposit", color: "text-green-400", icon: "+" },
-  Withdrawn: { label: "Withdraw", color: "text-blue-400", icon: "\u2191" },
-  Refunded: { label: "Refund", color: "text-yellow-400", icon: "\u21a9" },
-  FundsReturned: { label: "Return", color: "text-purple-400", icon: "\u21bb" },
-  Claimed: { label: "Claim", color: "text-cyan-400", icon: "\u2713" },
+  Deposited: { label: "Deposit", color: "text-green-600", icon: "+" },
+  Withdrawn: { label: "Withdraw", color: "text-gray-500", icon: "\u2191" },
+  Refunded: { label: "Refund", color: "text-red-500", icon: "\u21a9" },
+  FundsReturned: { label: "Return", color: "text-gray-500", icon: "\u21bb" },
+  Claimed: { label: "Claim", color: "text-gray-500", icon: "\u2713" },
 };
 
 function shortAddr(addr: string) {
@@ -76,19 +76,19 @@ export function ActivityFeed({
   const sorted = [...events].reverse();
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-      <h3 className="text-lg font-semibold text-white mb-4">Activity</h3>
+    <div className="rounded-xl border border-gray-200 bg-white p-5">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">Activity</h3>
 
       {loading ? (
-        <p className="text-gray-500 text-sm">Loading...</p>
+        <p className="text-gray-400 text-sm">Loading...</p>
       ) : sorted.length === 0 ? (
-        <p className="text-gray-500 text-sm">No activity yet</p>
+        <p className="text-gray-400 text-sm">No activity yet</p>
       ) : (
-        <div className="space-y-0 divide-y divide-gray-800">
+        <div className="space-y-0 divide-y divide-gray-200">
           {sorted.map((ev) => {
             const cfg = EVENT_CONFIG[ev.event_name] || {
               label: ev.event_name,
-              color: "text-gray-400",
+              color: "text-gray-500",
               icon: "?",
             };
             const wallet = ev.args.investor || ev.args.creator;
@@ -105,7 +105,7 @@ export function ActivityFeed({
                     {wallet && (
                       <Link
                         href={`/profile/${wallet}`}
-                        className="text-gray-400 hover:text-blue-400 font-mono text-xs transition"
+                        className="text-gray-500 hover:text-gray-900 font-mono text-xs transition"
                       >
                         {shortAddr(wallet)}
                       </Link>
@@ -113,7 +113,7 @@ export function ActivityFeed({
                   </div>
                 </div>
                 {amount && (
-                  <span className="text-white text-sm font-medium whitespace-nowrap">
+                  <span className="text-gray-900 text-sm font-medium whitespace-nowrap">
                     {amount} {tokenSymbol}
                   </span>
                 )}
@@ -121,7 +121,7 @@ export function ActivityFeed({
                   href={`https://sepolia.etherscan.io/tx/${ev.tx_hash}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-gray-600 hover:text-gray-400 text-xs transition shrink-0"
+                  className="text-gray-400 hover:text-gray-600 text-xs transition shrink-0"
                   title={ev.tx_hash}
                 >
                   {timeAgo(ev.indexed_at)}

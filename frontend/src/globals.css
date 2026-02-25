@@ -3,5 +3,5 @@
 @tailwind utilities;
 
 body {
-  @apply bg-gray-950 text-white;
+  @apply bg-[#EBEBEB] text-gray-900;
 }

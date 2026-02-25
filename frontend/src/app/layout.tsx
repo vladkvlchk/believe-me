@@ -4,7 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import "@/globals.css";
 
 export const metadata: Metadata = {
-  title: "Onchain Fundraiser",
+  title: "Aurelia",
   description: "Reputation-gated onchain fundraising platform",
 };
 

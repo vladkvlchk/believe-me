@@ -165,7 +165,7 @@ export default function CampaignPage() {
   }, [creatorAddr]);
 
   if (notFound) {
-    return <div className="text-center py-16 text-gray-500">Campaign not found</div>;
+    return <div className="text-center py-16 text-gray-400">Campaign not found</div>;
   }
 
   if (
@@ -177,7 +177,7 @@ export default function CampaignPage() {
     tokenResults.length < 2 ||
     tokenResults.some((r) => r.status !== "success")
   ) {
-    return <div className="text-center py-16 text-gray-500">Loading campaign...</div>;
+    return <div className="text-center py-16 text-gray-400">Loading campaign...</div>;
   }
 
   const creator = results[0]!.result as string;
@@ -211,20 +211,17 @@ export default function CampaignPage() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          {meta?.logo_url && (
-            <img src={meta.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover" />
-          )}
           <h1 className="text-2xl font-bold">{meta?.name || "Campaign"}</h1>
           <span
-            className={`text-xs px-2 py-1 rounded-full text-white ${isClosed ? "bg-gray-500" : "bg-blue-500"}`}
+            className={`text-xs px-2 py-1 rounded-full ${isClosed ? "bg-gray-300 text-gray-600" : "bg-gray-900 text-white"}`}
           >
             {isClosed ? "Closed" : "Active"}
           </span>
         </div>
-        <p className="text-gray-400 font-mono text-sm">{campaignAddress}</p>
+        <p className="text-gray-500 font-mono text-sm">{campaignAddress}</p>
         <div className="flex items-center gap-1.5 text-sm mt-1">
-          <span className="text-gray-400">by</span>
-          <Link href={`/profile/${creator}`} className="text-blue-400 hover:underline inline-flex items-center gap-1.5">
+          <span className="text-gray-500">by</span>
+          <Link href={`/profile/${creator}`} className="text-gray-600 hover:text-gray-900 hover:underline inline-flex items-center gap-1.5">
             {creatorProfile?.twitterAvatar && (
               <img src={creatorProfile.twitterAvatar} alt="" className="w-5 h-5 rounded-full" />
             )}
@@ -234,7 +231,7 @@ export default function CampaignPage() {
           </Link>
         </div>
         {meta?.description && (
-          <p className="text-gray-300 text-sm mt-3">{meta.description}</p>
+          <p className="text-gray-600 text-sm mt-3">{meta.description}</p>
         )}
       </div>
 
@@ -282,17 +279,17 @@ export default function CampaignPage() {
         {/* Right column — progress + deposit */}
         <div className="lg:col-span-2 space-y-4">
           {/* Progress card */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
             <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-300">
+              <span className="text-gray-600">
                 {fmt(raised, 2)} {tokenSymbol} raised
               </span>
-              {ceilNum > 0 && <span className="text-gray-500">{progress.toFixed(0)}%</span>}
+              {ceilNum > 0 && <span className="text-gray-400">{progress.toFixed(0)}%</span>}
             </div>
             {ceilNum > 0 && (
-              <div className="relative h-3 bg-gray-800 rounded-full overflow-hidden mb-4">
+              <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden mb-4">
                 <div
-                  className="h-full bg-blue-500 rounded-full transition-all"
+                  className="h-full bg-gray-900 rounded-full transition-all"
                   style={{ width: `${progress}%` }}
                 />
                 {floorNum > 0 && ceilNum > 0 && (
@@ -305,30 +302,30 @@ export default function CampaignPage() {
             )}
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-gray-500">Floor</span>
-                <p className="text-white">
+                <span className="text-gray-400">Floor</span>
+                <p className="text-gray-900">
                   {floorNum > 0 ? `${fmt(floorNum, 2)} ${tokenSymbol}` : "None"}
                 </p>
               </div>
               <div>
-                <span className="text-gray-500">Ceil</span>
-                <p className="text-white">
+                <span className="text-gray-400">Ceil</span>
+                <p className="text-gray-900">
                   {ceilNum > 0 ? `${fmt(ceilNum, 2)} ${tokenSymbol}` : "Unlimited"}
                 </p>
               </div>
             </div>
             {hasInvestment && (
-              <div className="mt-3 pt-3 border-t border-gray-800 text-sm">
-                <span className="text-gray-500">Your investment: </span>
-                <span className="text-green-400">
+              <div className="mt-3 pt-3 border-t border-gray-200 text-sm">
+                <span className="text-gray-400">Your investment: </span>
+                <span className="text-green-600">
                   {fmtToken(myInvestment!, tokenDecimals)} {tokenSymbol}
                 </span>
               </div>
             )}
             {returnedAmount > 0n && (
               <div className="mt-2 text-sm">
-                <span className="text-gray-500">Returned by creator: </span>
-                <span className="text-yellow-400">
+                <span className="text-gray-400">Returned by creator: </span>
+                <span className="text-amber-600">
                   {fmtToken(returnedAmount, tokenDecimals)} {tokenSymbol}
                 </span>
               </div>
@@ -392,9 +389,9 @@ function ClaimSection({
   if (claimable <= 0n) return null;
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
+    <div className="rounded-xl border border-gray-200 bg-white p-5">
       <h3 className="text-lg font-semibold mb-2">Claim Returned Funds</h3>
-      <p className="text-sm text-gray-400 mb-3">
+      <p className="text-sm text-gray-500 mb-3">
         You can claim {fmtToken(claimable, tokenDecimals)} {tokenSymbol}
       </p>
       <button
@@ -404,7 +401,7 @@ function ClaimSection({
       >
         {isPending ? "Confirm..." : isConfirming ? "Claiming..." : "Claim"}
       </button>
-      {isSuccess && <p className="mt-2 text-sm text-green-400">Claimed!</p>}
+      {isSuccess && <p className="mt-2 text-sm text-green-600">Claimed!</p>}
     </div>
   );
 }
@@ -422,9 +419,9 @@ function WithdrawSection({ campaignAddress }: { campaignAddress: `0x${string}` }
   }
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
+    <div className="rounded-xl border border-gray-200 bg-white p-5">
       <h3 className="text-lg font-semibold mb-2">Creator: Withdraw Funds</h3>
-      <p className="text-sm text-gray-400 mb-3">
+      <p className="text-sm text-gray-500 mb-3">
         Floor met. You can withdraw all raised funds.
       </p>
       <button
@@ -434,7 +431,7 @@ function WithdrawSection({ campaignAddress }: { campaignAddress: `0x${string}` }
       >
         {isPending ? "Confirm..." : isConfirming ? "Withdrawing..." : "Withdraw"}
       </button>
-      {isSuccess && <p className="mt-2 text-sm text-green-400">Withdrawn!</p>}
+      {isSuccess && <p className="mt-2 text-sm text-green-600">Withdrawn!</p>}
     </div>
   );
 }
@@ -504,9 +501,9 @@ function ReturnFundsSection({
   }
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
+    <div className="rounded-xl border border-gray-200 bg-white p-5">
       <h3 className="text-lg font-semibold mb-2">Creator: Return Funds</h3>
-      <p className="text-sm text-gray-400 mb-3">
+      <p className="text-sm text-gray-500 mb-3">
         Return funds to investors proportionally.
       </p>
       <div className="flex gap-2">
@@ -517,13 +514,13 @@ function ReturnFundsSection({
           placeholder={`Amount in ${tokenSymbol}`}
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="flex-1 rounded-lg bg-gray-800 border border-gray-700 px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+          className="flex-1 rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900"
         />
         {needsApproval ? (
           <button
             onClick={handleApprove}
             disabled={approvePending || approveConfirming || !amount}
-            className="rounded-lg bg-yellow-600 px-5 py-2 text-white font-medium hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="rounded-lg bg-gray-700 px-5 py-2 text-white font-medium hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             {approvePending ? "Confirm..." : approveConfirming ? "Approving..." : "Approve"}
           </button>
@@ -531,13 +528,13 @@ function ReturnFundsSection({
           <button
             onClick={handleReturn}
             disabled={returnPending || returnConfirming || !amount}
-            className="rounded-lg bg-blue-600 px-5 py-2 text-white font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="rounded-lg bg-gray-900 px-5 py-2 text-white font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             {returnPending ? "Confirm..." : returnConfirming ? "Returning..." : "Return"}
           </button>
         )}
       </div>
-      {returnSuccess && <p className="mt-2 text-sm text-green-400">Funds returned!</p>}
+      {returnSuccess && <p className="mt-2 text-sm text-green-600">Funds returned!</p>}
     </div>
   );
 }

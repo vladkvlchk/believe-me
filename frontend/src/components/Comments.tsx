@@ -95,12 +95,12 @@ function CommentForm({
         autoFocus={autoFocus}
         rows={2}
         maxLength={2000}
-        className="flex-1 rounded-lg bg-gray-800 border border-gray-700 px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
+        className="flex-1 rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-gray-900 resize-none"
       />
       <button
         type="submit"
         disabled={!content.trim() || submitting}
-        className="self-end rounded-lg bg-blue-600 px-4 py-2 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+        className="self-end rounded-lg bg-gray-900 px-4 py-2 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
       >
         {submitting ? "..." : "Post"}
       </button>
@@ -119,7 +119,7 @@ function AuthorDisplay({
   return (
     <Link
       href={`/profile/${author}`}
-      className="text-blue-400 hover:underline text-sm font-medium flex items-center gap-1.5"
+      className="text-gray-600 hover:text-gray-900 hover:underline text-sm font-medium flex items-center gap-1.5"
     >
       {profile?.twitterAvatar && (
         <img src={profile.twitterAvatar} alt="" className="w-4 h-4 rounded-full" />
@@ -154,19 +154,19 @@ function CommentItem({
   }
 
   return (
-    <div className={isReply ? "ml-8 border-l border-gray-800 pl-4" : ""}>
+    <div className={isReply ? "ml-8 border-l border-gray-200 pl-4" : ""}>
       <div className="py-3">
         <div className="flex items-center gap-2 mb-1">
           <AuthorDisplay author={comment.author} profiles={profiles} />
-          <span className="text-gray-600 text-xs">{timeAgo(comment.created_at)}</span>
+          <span className="text-gray-400 text-xs">{timeAgo(comment.created_at)}</span>
         </div>
-        <p className="text-gray-300 text-sm whitespace-pre-wrap break-words">
+        <p className="text-gray-600 text-sm whitespace-pre-wrap break-words">
           {comment.content}
         </p>
         {canComment && !isReply && (
           <button
             onClick={() => setShowReplyForm(!showReplyForm)}
-            className="text-gray-500 hover:text-gray-300 text-xs mt-1 transition"
+            className="text-gray-400 hover:text-gray-600 text-xs mt-1 transition"
           >
             {showReplyForm ? "Cancel" : "Reply"}
           </button>
@@ -304,8 +304,8 @@ export function Comments({ campaignAddress }: { campaignAddress: string }) {
   const tree = buildTree(comments);
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-      <h3 className="text-lg font-semibold text-white mb-4">
+    <div className="rounded-xl border border-gray-200 bg-white p-5">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">
         Comments{comments.length > 0 ? ` (${comments.length})` : ""}
       </h3>
 
@@ -314,13 +314,13 @@ export function Comments({ campaignAddress }: { campaignAddress: string }) {
           <CommentForm onSubmit={handleTopLevel} />
         </div>
       ) : address && !checkingProfile && !twitterLinked ? (
-        <div className="mb-4 rounded-lg bg-gray-800 p-3 text-sm">
-          <span className="text-gray-400">
+        <div className="mb-4 rounded-lg bg-gray-100 p-3 text-sm">
+          <span className="text-gray-500">
             Connect Twitter to comment.{" "}
           </span>
           <Link
             href={`/profile/${address}`}
-            className="text-blue-400 hover:underline"
+            className="text-gray-600 hover:text-gray-900 hover:underline"
           >
             Go to your profile
           </Link>
@@ -328,11 +328,11 @@ export function Comments({ campaignAddress }: { campaignAddress: string }) {
       ) : null}
 
       {loading ? (
-        <p className="text-gray-500 text-sm">Loading comments...</p>
+        <p className="text-gray-400 text-sm">Loading comments...</p>
       ) : tree.length === 0 ? (
-        <p className="text-gray-500 text-sm">No comments yet. Be the first!</p>
+        <p className="text-gray-400 text-sm">No comments yet. Be the first!</p>
       ) : (
-        <div className="divide-y divide-gray-800">
+        <div className="divide-y divide-gray-200">
           {tree.map((comment) => (
             <CommentItem
               key={comment.id}
